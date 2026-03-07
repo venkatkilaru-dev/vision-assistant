@@ -1,8 +1,20 @@
 from fastapi import FastAPI
 import time
+from pydantic import BaseModel
 from logging_config import setup_logging
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 logger = setup_logging()
 
 def check_vision_api():
@@ -41,3 +53,13 @@ def health_check():
 @app.get("/")
 def root():
     return {"message": "Conversational Vision Assistant Backend Running"}
+
+# ---------------------------
+# FIXED ANALYZE ROUTE
+# ---------------------------
+class ImageRequest(BaseModel):
+    image: str
+
+@app.post("/analyze")
+async def analyze(req: ImageRequest):
+    return {"description": "Vision test successful — backend received the frame."}

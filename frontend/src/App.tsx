@@ -1,8 +1,9 @@
-this is the final one 
+// this is the final one 
 import React, { useState, useRef } from "react";
 
 function App() {
   const [isActive, setIsActive] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [transcript, setTranscript] = useState("");
 const recognitionRef = useRef<any>(null);
@@ -59,9 +60,6 @@ const startSpeechRecognition = () => {
       const text = result[0].transcript.trim();
       setTranscript(text);
       console.log("Final transcript:", text);
-
-      // This is where we will trigger vision analysis later
-      // analyzeFrameWithTranscript(text);
     }
   };
 
@@ -72,6 +70,37 @@ const startSpeechRecognition = () => {
   recognition.start();
 };
 
+// Capture a single frame from the webcam
+const captureFrame = () => {
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+
+  if (!video || !canvas) return null;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL("image/jpeg");
+};
+
+const analyzeFrame = async () => {
+  const imageData = captureFrame();
+  if (!imageData) return;
+
+  const response = await fetch("http://localhost:5000/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: imageData }),
+  });
+
+  const result = await response.json();
+  setTranscript(prev => prev + "\nVision: " + result.description);
+};
 
  return (
   <div style={{ padding: "20px" }}>
@@ -83,6 +112,7 @@ const startSpeechRecognition = () => {
       autoPlay
       muted
     />
+<canvas ref={canvasRef} style={{ display: "none" }} />
 
     <div style={{ marginTop: "20px" }}>
       {!isActive ? (
@@ -90,6 +120,10 @@ const startSpeechRecognition = () => {
       ) : (
         <button onClick={stopConversation}>Stop Conversation</button>
       )}
+      <button onClick={analyzeFrame} style={{ marginTop: "10px" }}>
+  Analyze Frame
+</button>
+
     </div>
 
     {/* Transcript Display */}
