@@ -77,15 +77,15 @@ const captureFrame = () => {
 
   if (!video || !canvas) return null;
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+ canvas.width = 256;
+canvas.height = 256;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  return canvas.toDataURL("image/jpeg");
+  return canvas.toDataURL("image/jpeg", 0.3);
 };
 
 const analyzeFrame = async () => {

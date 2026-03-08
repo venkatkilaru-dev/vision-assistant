@@ -1,8 +1,10 @@
 from fastapi import FastAPI
-import time
 from pydantic import BaseModel
-from logging_config import setup_logging
 from fastapi.middleware.cors import CORSMiddleware
+from logging_config import setup_logging
+from ollama import Client
+import base64
+import time
 
 app = FastAPI()
 
@@ -16,6 +18,16 @@ app.add_middleware(
 )
 
 logger = setup_logging()
+client = Client()
+
+# ⭐ Warm up Moondream so first request is instant
+try:
+    client.chat(
+        model="moondream",
+        messages=[{"role": "user", "content": "warmup"}]
+    )
+except Exception as e:
+    print("Warmup failed (will still work on first request):", e)
 
 def check_vision_api():
     return True
@@ -41,7 +53,6 @@ def health_check():
     }
 
     healthy = all(status.values())
-
     logger.info(f"Health check status: {status}")
 
     return {
@@ -54,12 +65,29 @@ def health_check():
 def root():
     return {"message": "Conversational Vision Assistant Backend Running"}
 
-# ---------------------------
-# FIXED ANALYZE ROUTE
-# ---------------------------
 class ImageRequest(BaseModel):
     image: str
 
 @app.post("/analyze")
 async def analyze(req: ImageRequest):
-    return {"description": "Vision test successful — backend received the frame."}
+    base64_data = req.image.split(",")[1]
+
+    stream = client.chat(
+        model="moondream",
+        messages=[
+            {
+                "role": "user",
+                "content": "Describe this image.",
+                "images": [base64_data]
+            }
+        ],
+        stream=True
+    )
+
+    full_text = ""
+
+    for chunk in stream:
+        token = chunk["message"]["content"]
+        full_text += token
+
+    return {"description": full_text}
