@@ -70,24 +70,48 @@ class ImageRequest(BaseModel):
 
 @app.post("/analyze")
 async def analyze(req: ImageRequest):
-    base64_data = req.image.split(",")[1]
+    try:
+        logger.info("Received image for analysis")
 
-    stream = client.chat(
-        model="moondream",
-        messages=[
-            {
+        base64_data = req.image.split(",")[1]
+        logger.info("Image decoded successfully")
+
+        # Fast pass
+        logger.info("Running Moondream fast pass")
+        fast_response = client.chat(
+            model="moondream",
+            messages=[{
                 "role": "user",
-                "content": "Describe this image.",
+                "content": "Quickly describe this image in one short sentence.",
                 "images": [base64_data]
-            }
-        ],
-        stream=True
-    )
+            }]
+        )["message"]["content"]
+        logger.info(f"Moondream response: {fast_response}")
 
-    full_text = ""
+        # Decide if we need LLaVA
+        needs_detail = any(keyword in fast_response.lower() for keyword in [
+            "unclear", "not sure", "can't tell", "blurry", "unknown",
+            "text", "words", "numbers", "small", "detailed", "complex"
+        ])
 
-    for chunk in stream:
-        token = chunk["message"]["content"]
-        full_text += token
+        if not needs_detail:
+            logger.info("Fast response is good enough")
+            return {"description": fast_response}
 
-    return {"description": full_text}
+        # Slow pass
+        logger.info("Running LLaVA detailed pass")
+        detailed_response = client.chat(
+            model="llava:7b",
+            messages=[{
+                "role": "user",
+                "content": "Describe this image in detail.",
+                "images": [base64_data]
+            }]
+        )["message"]["content"]
+
+        logger.info("LLaVA detailed response complete")
+        return {"description": detailed_response}
+
+    except Exception as e:
+        logger.error(f"Error during analysis: {e}")
+        return {"description": "Error analyzing image"}
