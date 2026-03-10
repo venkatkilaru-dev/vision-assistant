@@ -12,16 +12,16 @@
          │                            │                            │
          ▼                            ▼                            ▼
 ┌──────────────────┐       ┌──────────────────────┐      ┌──────────────────────┐
-│ Webcam (video)   │       │ Speech Recognition  │      │ Chat UI (Messages)  │
-│ getUserMedia()   │       │ Web Speech API      │      │ User + Vision Output│
+│ Webcam (video)   │       │ Speech Recognition   │      │ Chat UI (Messages)   │
+│ getUserMedia()   │       │ Web Speech API       │      │ User + Vision Output │
 └──────────────────┘       └──────────────────────┘      └──────────────────────┘
          │
          │ 2. Capture ONE frame (hidden canvas)
          ▼
 ┌──────────────────────────────────────────────────────────┐
-│ Hidden Canvas (not shown in UI)                           │
-│ drawImage(video → 512x512)                                │
-│ toDataURL() → Base64 image                                │
+│ Hidden Canvas (not shown in UI)                          │
+│ drawImage(video → 512x512)                               │
+│ toDataURL() → Base64 image                               │
 └──────────────────────────────────────────────────────────┘
          │
          │ 3. Send Base64 image
