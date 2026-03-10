@@ -1,19 +1,19 @@
                    ┌────────────────────────────────────────┐
-                   │        Conversational Vision App        │
+                   │        Conversational Vision App       │
                    └────────────────────────────────────────┘
                                       │
                                       │ 1. Start Conversation
                                       ▼
                      ┌────────────────────────────────┐
-                     │   Frontend (React + TypeScript) │
+                     │   Frontend (React + TypeScript)│
                      └────────────────────────────────┘
                                       │
          ┌────────────────────────────┼────────────────────────────┐
          │                            │                            │
          ▼                            ▼                            ▼
 ┌──────────────────┐       ┌──────────────────────┐      ┌──────────────────────┐
-│ Webcam (video)    │       │ Speech Recognition   │      │ Chat UI (Messages)   │
-│ getUserMedia()    │       │ Web Speech API       │      │ User + Vision Output │
+│ Webcam (video)   │       │ Speech Recognition  │      │ Chat UI (Messages)  │
+│ getUserMedia()   │       │ Web Speech API      │      │ User + Vision Output│
 └──────────────────┘       └──────────────────────┘      └──────────────────────┘
          │
          │ 2. Capture ONE frame (hidden canvas)
@@ -27,30 +27,30 @@
          │ 3. Send Base64 image
          ▼
 ┌──────────────────────────────────────────────────────────┐
-│ POST /analyze (FastAPI Backend)                           │
-│ Content-Type: application/json                             │
-│ { "image": "<base64>" }                                    │
+│ POST /analyze (FastAPI Backend)                          │
+│ Content-Type: application/json                           │
+│ { "image": "<base64>" }                                  │
 └──────────────────────────────────────────────────────────┘
          │
          │ 4. Backend Vision Pipeline
          ▼
 ┌──────────────────────────────────────────────────────────┐
-│                FastAPI Vision Backend                     │
+│                FastAPI Vision Backend                    │
 ├──────────────────────────────────────────────────────────┤
-│ Decode Base64 → PIL Image                                 │
-│ Run Moondream (fast pass)                                 │
-│ Run LLaVA (accurate pass)                                 │
-│ Merge / refine output                                     │
+│ Decode Base64 → PIL Image                                │
+│ Run Moondream (fast pass)                                │
+│ Run LLaVA (accurate pass)                                │
+│ Merge / refine output                                    │
 └──────────────────────────────────────────────────────────┘
          │
          │ 5. Return JSON description
          ▼
 ┌──────────────────────────────────────────────────────────┐
-│ { "description": "A man holding a bottle..." }            │
+│ { "description": "A man holding a bottle..." }           │
 └──────────────────────────────────────────────────────────┘
          │
          │ 6. Display in Chat UI
          ▼
 ┌──────────────────────────────────────────────────────────┐
-│ Vision: "A man holding a bottle..."                       │
+│ Vision: "A man holding a bottle..."                      │
 └──────────────────────────────────────────────────────────┘
