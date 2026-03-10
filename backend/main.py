@@ -5,7 +5,9 @@ from logging_config import setup_logging
 from ollama import Client
 import base64
 import time
-
+from PIL import Image
+import io
+import numpy as np
 app = FastAPI()
 
 # CORS middleware
@@ -67,16 +69,45 @@ def root():
 
 class ImageRequest(BaseModel):
     image: str
+# Detect low-light frames
+def is_low_light(base64_data):
+    try:
+        img_bytes = base64.b64decode(base64_data)
+        img = Image.open(io.BytesIO(img_bytes)).convert("L")  # grayscale
+        arr = np.array(img)
+        brightness = arr.mean()
+        return brightness < 60  # threshold
+    except:
+        return False
 
+# Detect hallucination patterns Moondream often produces
+HALLUCINATION_PATTERNS = [
+    "urn", "vase", "shelf", "white wall", "window", "blinds",
+    "fruit", "flowers", "clock", "painting"
+]
+
+def looks_hallucinated(text):
+    text = text.lower()
+    return any(p in text for p in HALLUCINATION_PATTERNS)
+
+# Detect low-information responses
+def is_low_information(text):
+    return len(text.split()) < 5
+
+# Detect missing face references
+def face_missing(text):
+    text = text.lower()
+    return ("person" not in text and "man" not in text and "woman" not in text)
 @app.post("/analyze")
 async def analyze(req: ImageRequest):
     try:
         logger.info("Received image for analysis")
 
         base64_data = req.image.split(",")[1]
-        logger.info("Image decoded successfully")
 
-        # Fast pass
+        # ---------------------------
+        # FAST PASS — MOONDREAM
+        # ---------------------------
         logger.info("Running Moondream fast pass")
         fast_response = client.chat(
             model="moondream",
@@ -86,31 +117,41 @@ async def analyze(req: ImageRequest):
                 "images": [base64_data]
             }]
         )["message"]["content"]
+
         logger.info(f"Moondream response: {fast_response}")
 
-        # Decide if we need LLaVA
-        needs_detail = any(keyword in fast_response.lower() for keyword in [
-            "unclear", "not sure", "can't tell", "blurry", "unknown",
-            "text", "words", "numbers", "small", "detailed", "complex"
-        ])
+        # ---------------------------
+        # CONFIDENCE CHECKS
+        # ---------------------------
+        low_info = is_low_information(fast_response)
+        hallucinated = looks_hallucinated(fast_response)
+        dark = is_low_light(base64_data)
+        missing_face = face_missing(fast_response)
 
-        if not needs_detail:
-            logger.info("Fast response is good enough")
-            return {"description": fast_response}
+        logger.info(
+            f"Confidence flags → low_info={low_info}, "
+            f"hallucinated={hallucinated}, dark={dark}, missing_face={missing_face}"
+        )
 
-        # Slow pass
-        logger.info("Running LLaVA detailed pass")
-        detailed_response = client.chat(
-            model="llava:7b",
-            messages=[{
-                "role": "user",
-                "content": "Describe this image in detail.",
-                "images": [base64_data]
-            }]
-        )["message"]["content"]
+        # If ANY confidence issue → fallback to LLaVA
+        if low_info or hallucinated or dark or missing_face:
+            logger.info("Low confidence → switching to LLaVA")
 
-        logger.info("LLaVA detailed response complete")
-        return {"description": detailed_response}
+            detailed_response = client.chat(
+                model="llava:7b",
+                messages=[{
+                    "role": "user",
+                    "content": "Describe this image in detail.",
+                    "images": [base64_data]
+                }]
+            )["message"]["content"]
+
+            logger.info(f"LLaVA detailed response: {detailed_response}")
+            return {"description": detailed_response}
+
+        # Otherwise Moondream is good
+        logger.info("Moondream response accepted")
+        return {"description": fast_response}
 
     except Exception as e:
         logger.error(f"Error during analysis: {e}")

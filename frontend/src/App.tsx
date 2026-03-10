@@ -8,6 +8,9 @@ function App() {
   const [messages, setMessages] = useState<{ sender: string; text: string }[]>([]);
   const recognitionRef = useRef<any>(null);
 
+  // ⭐ Track if first output was posted
+  const outputPostedRef = useRef(false);
+
   const startConversation = async () => {
     setIsActive(true);
 
@@ -22,6 +25,11 @@ function App() {
     }
 
     startSpeechRecognition();
+
+    // ⭐ Wait 300ms for webcam to warm up, then analyze ONCE
+    setTimeout(() => {
+      analyzeFrame();
+    }, 300);
   };
 
   const stopConversation = () => {
@@ -57,8 +65,7 @@ function App() {
       if (result.isFinal) {
         const text = result[0].transcript.trim();
         setTranscript(text);
-        setMessages(prev => [...prev, { sender: "You", text }]);
-        console.log("Final transcript:", text);
+        setMessages((prev) => [...prev, { sender: "You", text }]);
       }
     };
 
@@ -75,6 +82,7 @@ function App() {
 
     if (!video || !canvas) return null;
 
+    // Canvas is hidden but still works
     canvas.width = 512;
     canvas.height = 512;
 
@@ -82,18 +90,21 @@ function App() {
     if (!ctx) return null;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-console.log("Canvas drawn:", canvas.width, canvas.height);
 
     return canvas.toDataURL("image/jpeg", 0.7);
   };
 
   const analyzeFrame = async () => {
+    console.log("analyzeFrame() called");
+
     const imageData = captureFrame();
-    if (!imageData) return;
+    if (!imageData) {
+      console.log("No frame captured");
+      return;
+    }
 
     try {
       console.log("Sending frame to backend...");
-console.log("Image size:", imageData.length);
 
       const response = await fetch("http://localhost:5000/analyze", {
         method: "POST",
@@ -101,26 +112,33 @@ console.log("Image size:", imageData.length);
         body: JSON.stringify({ image: imageData }),
       });
 
-      if (!response.ok) {
-        throw new Error("Backend returned an error");
-      }
-
       const result = await response.json();
 
       console.log("Vision response:", result.description);
 
-      setMessages(prev => [
+      // ⭐ Mark output as posted
+      outputPostedRef.current = true;
+      console.log("outputPosted set to TRUE");
+
+      setMessages((prev) => [
         ...prev,
-        { sender: "Vision", text: result.description }
+        { sender: "Vision", text: result.description },
       ]);
 
     } catch (err) {
       console.error("Analyze error:", err);
 
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
-        { sender: "System", text: "Error analyzing frame" }
+        { sender: "System", text: "Error analyzing frame" },
       ]);
+    }
+
+    // ⭐ If outputPosted is true → analyze again ONCE
+    if (outputPostedRef.current) {
+      outputPostedRef.current = false; // reset so it only runs once
+      console.log("Running second analysis because outputPosted was TRUE");
+      analyzeFrame(); // run ONE more time
     }
   };
 
@@ -134,7 +152,12 @@ console.log("Image size:", imageData.length);
         autoPlay
         muted
       />
-      <canvas ref={canvasRef} style={{ width: 200, border: "2px solid red" }} />
+
+      {/* ⭐ Hidden canvas (used only for frame capture) */}
+      <canvas
+        ref={canvasRef}
+        style={{ display: "none" }}
+      />
 
       <div style={{ marginTop: "20px" }}>
         {!isActive ? (
@@ -142,9 +165,6 @@ console.log("Image size:", imageData.length);
         ) : (
           <button onClick={stopConversation}>Stop Conversation</button>
         )}
-        <button onClick={analyzeFrame} style={{ marginTop: "10px" }}>
-          Analyze Frame
-        </button>
       </div>
 
       <div style={{ marginTop: "20px" }}>
@@ -152,7 +172,6 @@ console.log("Image size:", imageData.length);
         <p>{transcript}</p>
       </div>
 
-      {/* ⭐ Chat UI */}
       <div style={{ marginTop: "20px" }}>
         <h3>Chat</h3>
         <div
@@ -162,7 +181,7 @@ console.log("Image size:", imageData.length);
             height: "250px",
             overflowY: "auto",
             background: "#f7f7f7",
-            borderRadius: "6px"
+            borderRadius: "6px",
           }}
         >
           {messages.map((msg, i) => (
